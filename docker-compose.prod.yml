@@ -1,0 +1,76 @@
+version: '3.8'
+
+services:
+  backend:
+    build:
+      context: ./backend
+      dockerfile: Dockerfile
+    container_name: accountech-backend
+    restart: unless-stopped
+    volumes:
+      - ./backend/data:/app/data
+      - ./backend/app_password.txt:/app/app_password.txt
+    environment:
+      - DATABASE_URL=sqlite:///./data/accounting.db
+      - PYTHONUNBUFFERED=1
+      - VIRTUAL_HOST=api.etherium.group
+      - LETSENCRYPT_HOST=api.etherium.group
+      - LETSENCRYPT_EMAIL=admin@etherium.group
+    expose:
+      - "8000"
+    networks:
+      - accountech-network
+
+  frontend:
+    build:
+      context: ./frontend
+      dockerfile: Dockerfile
+    container_name: accountech-frontend
+    restart: unless-stopped
+    environment:
+      - VIRTUAL_HOST=etherium.group,www.etherium.group
+      - LETSENCRYPT_HOST=etherium.group,www.etherium.group
+      - LETSENCRYPT_EMAIL=admin@etherium.group
+    expose:
+      - "80"
+    depends_on:
+      - backend
+    networks:
+      - accountech-network
+
+  nginx-proxy:
+    image: nginxproxy/nginx-proxy:alpine
+    container_name: nginx-proxy
+    restart: unless-stopped
+    ports:
+      - "80:80"
+      - "443:443"
+    volumes:
+      - /var/run/docker.sock:/tmp/docker.sock:ro
+      - ./nginx/certs:/etc/nginx/certs:ro
+      - ./nginx/vhost.d:/etc/nginx/vhost.d
+      - ./nginx/html:/usr/share/nginx/html
+    networks:
+      - accountech-network
+
+  acme-companion:
+    image: nginxproxy/acme-companion
+    container_name: nginx-proxy-acme
+    restart: unless-stopped
+    volumes:
+      - /var/run/docker.sock:/var/run/docker.sock:ro
+      - ./nginx/certs:/etc/nginx/certs:rw
+      - ./nginx/vhost.d:/etc/nginx/vhost.d
+      - ./nginx/html:/usr/share/nginx/html
+      - ./nginx/acme:/etc/acme.sh
+    environment:
+      - DEFAULT_EMAIL=admin@etherium.group
+      - NGINX_PROXY_CONTAINER=nginx-proxy
+    depends_on:
+      - nginx-proxy
+    networks:
+      - accountech-network
+
+networks:
+  accountech-network:
+    driver: bridge
