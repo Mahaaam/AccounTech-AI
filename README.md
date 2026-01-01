@@ -18,6 +18,34 @@
 
 ---
 
+## 📸 تصاویر پروژه
+
+<div align="center">
+
+### 🔐 صفحه ورود
+<img src="screenshots/login.jpg" alt="Login Page" width="800"/>
+
+### 📊 داشبورد
+<img src="screenshots/Dashboard.jpg" alt="Dashboard" width="800"/>
+
+### 📁 مدیریت حساب‌ها
+<img src="screenshots/accounts1.jpg" alt="Accounts Management" width="800"/>
+
+<img src="screenshots/accounts2.jpg" alt="Accounts Hierarchy" width="800"/>
+
+### 🎤 ثبت صوتی
+<img src="screenshots/voice.jpg" alt="Voice Entry" width="800"/>
+
+### 📸 اسکن فیش (OCR)
+<img src="screenshots/scan.jpg" alt="OCR Entry" width="800"/>
+
+### ⚙️ تنظیمات
+<img src="screenshots/setting.jpg" alt="Settings" width="800"/>
+
+</div>
+
+---
+
 ## 🌟 ویژگی‌های برجسته
 
 - 🎤 **ثبت صوتی هوشمند**: پردازش دستورات صوتی فارسی و تبدیل به سند حسابداری
