@@ -126,18 +126,26 @@ class AccountingService:
         entry_number = AccountingService._generate_entry_number(db)
         
         counterparty_name = voice_data.get('counterparty', 'نامشخص')
+        amount = voice_data.get('amount', 0)
+        transaction_type = voice_data.get('transaction_type')
+        
+        # ساخت توضیحات استاندارد حسابداری
+        if transaction_type == 'payment':
+            # پرداخت: ما به کسی پول دادیم
+            standard_description = f"پرداخت {amount:,.0f} ریال به {counterparty_name}"
+        else:
+            # دریافت: کسی به ما پول داد
+            standard_description = f"دریافت {amount:,.0f} ریال از {counterparty_name}"
         
         journal_entry = models.JournalEntry(
             entry_number=entry_number,
             date=datetime.now(),
-            description=voice_data.get('description', voice_text),
+            description=standard_description,
             source='voice',
             voice_text=voice_text
         )
         db.add(journal_entry)
         db.flush()
-        
-        amount = voice_data.get('amount', 0)
         
         # حساب صندوق
         cash_account = AccountingService._get_or_create_account(
@@ -161,7 +169,7 @@ class AccountingService:
                 account_id=creditor_account.id,
                 transaction_type=models.TransactionType.DEBIT,
                 amount=amount,
-                description=f'پرداخت به {counterparty_name}'
+                description=f'{counterparty_name} - بدهکار'
             ))
             
             # بستانکار: صندوق (پول از صندوق کم شد)
@@ -170,7 +178,7 @@ class AccountingService:
                 account_id=cash_account.id,
                 transaction_type=models.TransactionType.CREDIT,
                 amount=amount,
-                description=f'پرداخت به {counterparty_name}'
+                description=f'صندوق - بستانکار'
             ))
             
         else:
@@ -190,7 +198,7 @@ class AccountingService:
                 account_id=cash_account.id,
                 transaction_type=models.TransactionType.DEBIT,
                 amount=amount,
-                description=f'دریافت از {counterparty_name}'
+                description=f'صندوق - بدهکار'
             ))
             
             # بستانکار: بدهکار (او به ما بدهکار است)
@@ -199,7 +207,7 @@ class AccountingService:
                 account_id=debtor_account.id,
                 transaction_type=models.TransactionType.CREDIT,
                 amount=amount,
-                description=f'دریافت از {counterparty_name}'
+                description=f'{counterparty_name} - بستانکار'
             ))
         
         db.commit()
