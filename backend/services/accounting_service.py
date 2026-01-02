@@ -116,7 +116,16 @@ class AccountingService:
     @staticmethod
     def create_journal_entry_from_voice(db: Session, voice_data: dict, 
                                        voice_text: str) -> models.JournalEntry:
+        """
+        ثبت سند حسابداری دوبل از دستور صوتی
+        
+        منطق حسابداری دوبل:
+        - دریافت پول: صندوق (بدهکار) / طرف حساب (بستانکار)
+        - پرداخت پول: طرف حساب (بدهکار) / صندوق (بستانکار)
+        """
         entry_number = AccountingService._generate_entry_number(db)
+        
+        counterparty_name = voice_data.get('counterparty', 'نامشخص')
         
         journal_entry = models.JournalEntry(
             entry_number=entry_number,
@@ -130,51 +139,67 @@ class AccountingService:
         
         amount = voice_data.get('amount', 0)
         
+        # حساب صندوق
+        cash_account = AccountingService._get_or_create_account(
+            db, 'صندوق', models.AccountType.ASSET
+        )
+        
         if voice_data.get('transaction_type') == 'payment':
-            expense_account = AccountingService._get_or_create_account(
-                db, voice_data.get('account_name', 'هزینه‌های متفرقه'), models.AccountType.EXPENSE
-            )
-            cash_account = AccountingService._get_or_create_account(
-                db, 'صندوق', models.AccountType.ASSET
+            # پرداخت: ما به کسی پول دادیم
+            # مثال: "به آذین 500 هزار تومان دادم"
+            # بدهکار: آذین (بستانکار)
+            # بستانکار: صندوق
+            
+            # ایجاد/دریافت حساب بستانکار
+            creditor_account = AccountingService._get_or_create_account(
+                db, counterparty_name, models.AccountType.CREDITOR
             )
             
+            # بدهکار: بستانکار (ما به او بدهکاریم)
             db.add(models.Transaction(
                 journal_entry_id=journal_entry.id,
-                account_id=expense_account.id,
+                account_id=creditor_account.id,
                 transaction_type=models.TransactionType.DEBIT,
                 amount=amount,
-                description=voice_data.get('counterparty')
+                description=f'پرداخت به {counterparty_name}'
             ))
             
+            # بستانکار: صندوق (پول از صندوق کم شد)
             db.add(models.Transaction(
                 journal_entry_id=journal_entry.id,
                 account_id=cash_account.id,
                 transaction_type=models.TransactionType.CREDIT,
                 amount=amount,
-                description=voice_data.get('counterparty')
+                description=f'پرداخت به {counterparty_name}'
             ))
+            
         else:
-            revenue_account = AccountingService._get_or_create_account(
-                db, voice_data.get('account_name', 'درآمدهای متفرقه'), models.AccountType.REVENUE
-            )
-            cash_account = AccountingService._get_or_create_account(
-                db, 'صندوق', models.AccountType.ASSET
+            # دریافت: کسی به ما پول داد
+            # مثال: "آذین به من 500 هزار تومان داد"
+            # بدهکار: صندوق
+            # بستانکار: آذین (بدهکار)
+            
+            # ایجاد/دریافت حساب بدهکار
+            debtor_account = AccountingService._get_or_create_account(
+                db, counterparty_name, models.AccountType.DEBTOR
             )
             
+            # بدهکار: صندوق (پول به صندوق اضافه شد)
             db.add(models.Transaction(
                 journal_entry_id=journal_entry.id,
                 account_id=cash_account.id,
                 transaction_type=models.TransactionType.DEBIT,
                 amount=amount,
-                description=voice_data.get('counterparty')
+                description=f'دریافت از {counterparty_name}'
             ))
             
+            # بستانکار: بدهکار (او به ما بدهکار است)
             db.add(models.Transaction(
                 journal_entry_id=journal_entry.id,
-                account_id=revenue_account.id,
+                account_id=debtor_account.id,
                 transaction_type=models.TransactionType.CREDIT,
                 amount=amount,
-                description=voice_data.get('counterparty')
+                description=f'دریافت از {counterparty_name}'
             ))
         
         db.commit()
